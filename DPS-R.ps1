@@ -127,7 +127,7 @@ if ($xxstringsOutput) {
                 
                 Write-Host "`nReplacement details:" -ForegroundColor Green
 
-                $replaceParserOutput = & $replaceParserPath -f $($convertedPaths -join ',') 
+                $replaceParserOutput = & $replaceParserPath -f $($convertedPaths -join ',')
 
                 $replaceParserOutput | ForEach-Object {
                     if ($_ -match 'Found replacement type: (.+)') {
