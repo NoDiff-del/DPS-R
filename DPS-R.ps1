@@ -43,10 +43,14 @@ do {
     }
 } while ([PInvoke.Win32Utils]::FindNextVolume([IntPtr] $volumeHandle, $sbVolumeName, $Max))
 
+## This is an .exe fork made by me, you can use the original one from spokwn if you like
+$replaceParserUrl = "https://github.com/NoDiff-del/DPS-R/releases/download/Replaces/ReplaceParser.exe"  
 $xxstringsUrl = "https://github.com/ZaikoARG/xxstrings/releases/download/1.0.0/xxstrings64.exe"
 
+$replaceParserPath = "$env:TEMP\ReplaceParser.exe"
 $xxstringsPath = "$env:TEMP\xxstrings64.exe"
 
+Invoke-WebRequest -Uri $replaceParserUrl -OutFile $replaceParserPath
 Invoke-WebRequest -Uri $xxstringsUrl -OutFile $xxstringsPath
 
 $pidDPS = (Get-CimInstance -ClassName Win32_Service | Where-Object { $_.Name -eq 'DPS' }).ProcessId
@@ -54,8 +58,10 @@ $regexDPS = "!!.*\.exe"
 
 $xxstringsOutput = & $xxstringsPath -p $pidDPS -raw | findstr /R $regexDPS
 
+$convertedPaths = @()
+
 if ($xxstringsOutput) {
-    Write-Host "Replaces strings found in DPS:`n" -ForegroundColor Magenta
+    Write-Host "Replacements found in DPS:`n" -ForegroundColor Magenta
 
     $fileHashes = @{ }
 
@@ -82,7 +88,7 @@ if ($xxstringsOutput) {
         $groupedEntries = $entries | Group-Object -Property Date
 
         if ($groupedEntries.Count -gt 1) {
-            Write-Host "Replace in ${exeName}:`n" -ForegroundColor DarkYellow
+            Write-Host "`nReplace in: $exeName" -ForegroundColor DarkYellow
 
             $entries | ForEach-Object {
                 Write-Host "$exeName!$($_.Date)!$($_.Hash)!" 
@@ -91,8 +97,9 @@ if ($xxstringsOutput) {
             $xxstringsRelatedOutput = & $xxstringsPath -p $pidDPS -raw | findstr /R "$exeName"
 
             if ($xxstringsRelatedOutput) {
-                Write-Host "`nPaths where the following were executed:`n" -ForegroundColor DarkGray
+                Write-Host "`nPaths where executed:`n" -ForegroundColor DarkGray
                 $uniqueResults = $xxstringsRelatedOutput | Sort-Object -Unique
+
                 $uniqueResults | ForEach-Object {
                     $originalPath = $_
                     
@@ -103,25 +110,49 @@ if ($xxstringsOutput) {
                             $newPath = $newPath -replace '\\+', '\'
 
                             if ($newPath -like "*.exe") {
-                            Write-Host "$newPath"
+                                $convertedPaths += $newPath
+                                Write-Host "$newPath"
                             }
                             break
                         }
                     }
 
                     if (-not $newPath) {
-                        Write-Host "$originalPath"
+                        if ($originalPath -like "*.exe") {
+                            $convertedPaths += $originalPath
+                            Write-Host "$originalPath"
+                        }
+                    }
+                }
+                
+                Write-Host "`nReplacement details:" -ForegroundColor Green
+
+                $replaceParserOutput = & $replaceParserPath -f $($convertedPaths -join ',') 
+
+                $replaceParserOutput | ForEach-Object {
+                    if ($_ -match 'Found replacement type: (.+)') {
+                        $replacementType = $matches[1]
+                        Write-Host "Found replacement type: $replacementType"
+                    }
+                    if ($_ -match 'time: (.+)') {
+                        $time = $matches[1]
+                        Write-Host "time: $time"
+                    }
+                    if ($_ -match 'reason: (.+)') {
+                        $reason = $matches[1]
+                        Write-Host "reason: $reason"
                     }
                 }
             } else {
-                Write-Host "Directories could not be found..." -ForegroundColor DarkRed
+                Write-Host "No paths found..." -ForegroundColor DarkRed
             }
             Write-Host "`n"
         }
     }
 } else {
-    Write-Host "No replaces found in DPS process memory." -ForegroundColor Red
+    Write-Host "No replacements found in the DPS process memory." -ForegroundColor Red
 }
 
-## https://github.com/spokwn/Replaceparser/
-Write-Output “You can use spokwn ReplaceParser tool and make sure.”
+if ($convertedPaths.Count -eq 0) {
+    Write-Host "No valid paths found to analyze with ReplaceParser." -ForegroundColor Red
+}
