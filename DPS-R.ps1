@@ -141,6 +141,7 @@ if ($xxstringsOutput) {
                     if ($_ -match 'reason: (.+)') {
                         $reason = $matches[1]
                         Write-Host "reason: $reason"
+                        Write-Host " "
                     }
                 }
             } else {
